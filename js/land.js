@@ -1,5 +1,5 @@
 /* The living landscape: contour lines drawn from noise, shaped by the quiz answers.
-   Rwanda answers raise rolling hills; South Africa answers flatten it into bushveld with a river. */
+   Rwanda answers raise rolling hills; Cape Town answers lift a flat-topped mountain above a coastline. */
 
 window.Land = (() => {
   /* ---------- Perlin noise (3D) ---------- */
@@ -41,7 +41,7 @@ window.Land = (() => {
   }
 
   /* ---------- Shape of the land ---------- */
-  const DEFAULTS = { hills: 0.5, river: 0.25, warmth: 0.5, levels: 11, ox: 0, oy: 0, oz: 0 };
+  const DEFAULTS = { hills: 0.5, coast: 0.2, table: 0, warmth: 0.5, levels: 11, ox: 0, oy: 0, oz: 0 };
 
   function sampleGrid(cols, rows, aspect, p, t, zone) {
     const z = zone || { x0: 0.08, x1: 0.92, y0: 0.1, y1: 0.9 };
@@ -54,12 +54,16 @@ window.Land = (() => {
       for (let i = 0; i <= cols; i++) {
         const nx = (i / cols) * aspect;
         let v = 0.5 + fbm(nx * freq + p.ox, ny * freq + p.oy, t + p.oz) * amp;
-        // flatter land sinks gently toward one side, like a plain running to a river
-        v += (1 - p.hills) * 0.12 * (0.5 - ny);
-        if (p.river > 0.01) {
-          const cy = 0.64 + 0.09 * Math.sin(nx * 2.3 + p.ox) + 0.04 * Math.sin(nx * 5.3 + p.oy);
-          const d = ny - cy;
-          v -= p.river * 0.32 * Math.exp(-(d * d) / 0.005);
+        // a flat-topped massif: the height is capped, so lines crowd at its cliffs and the top stays empty
+        if (p.table > 0.01) {
+          const mx = (nx - aspect * (0.62 + 0.06 * Math.sin(p.ox))) / 0.42, my = (ny - 0.36) / 0.17;
+          v += p.table * 0.42 * Math.min(1, 2.4 * Math.exp(-(mx * mx + my * my)));
+        }
+        // the land drops into the sea along a wavy shoreline near the bottom
+        if (p.coast > 0.01) {
+          const shore = 0.74 + 0.05 * Math.sin(nx * 3.1 + p.ox) + 0.025 * Math.sin(nx * 7.7 + p.oy);
+          const d = Math.max(0, Math.min(1, (ny - shore) / 0.14 + 0.5));
+          v -= p.coast * 0.55 * d * d * (3 - 2 * d);
         }
         vals[j * (cols + 1) + i] = v;
         if (v > max && i > cols * z.x0 && i < cols * z.x1 && j > rows * z.y0 && j < rows * z.y1) { max = v; maxI = i; maxJ = j; }
@@ -185,7 +189,7 @@ window.Land = (() => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       // keep "your mark" in open land: right of the question panel, above the meter (phones: the strip above the panel)
-      const zone = w <= 820 ? { x0: 0.15, x1: 0.7, y0: 0.2, y1: 0.28 } : { x0: Math.min(0.85, 900 / w), x1: 0.9, y0: 0.14, y1: 0.55 };
+      const zone = w <= 820 ? { x0: 0.15, x1: 0.7, y0: 0.2, y1: 0.28 } : { x0: Math.min(0.85, 900 / w), x1: 0.9, y0: 0.14, y1: 0.46 };
       const peak = draw(ctx, { x: 0, y: 0, w: canvas.width, h: canvas.height }, cur, t, 'night', dpr, zone);
       mp = mp ? { x: mp.x + (peak.x - mp.x) * 0.06, y: mp.y + (peak.y - mp.y) * 0.06 } : peak; // glide, don't jump
       if (showMark) drawMark(ctx, mp, dpr, reduce ? null : (now / 1800) % 1, 'rgba(244,237,225,.85)', markLabel);

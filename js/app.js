@@ -47,7 +47,7 @@
       setInterval(() => { if (document.body.dataset.screen === 'intro') { front = (front + 1) % cards.length; order(); } }, 3600);
     }
 
-    const items = Object.values(D.programs).map(p => `<span>${esc(p.name)} <em>${esc(D.places[p.place].city)}</em></span>`).join('');
+    const items = Object.values(D.programs).map(p => `<span>${esc(p.name)} <em>${esc(p.tag)}</em></span>`).join('');
     $('#ticker').innerHTML = items + items;
 
     if (window.QRCode) { // shown on wide screens and in kiosk mode (see CSS)
@@ -73,9 +73,10 @@
     if (a.study) add(opt('study', a.study).score);
     if (a.day != null) {
       const n = a.day / 100;
-      for (const k in s) s[k] += ['wild', 'sustain'].includes(k) ? n * 3 : (1 - n) * 2;
+      const q = Q('day');
+      for (const k in s) s[k] += (q.nature[k] || 0) * n + (q.people[k] || 0) * (1 - n);
     }
-    if (a.place) for (const k in s) if (D.programs[k].place === a.place) s[k] += 3;
+    if (a.place) add(opt('place', a.place).score);
     if (a.learn) add(opt('learn', a.learn).score);
     return s;
   }
@@ -90,10 +91,10 @@
     const p = { ...Land.DEFAULTS };
     if (a.study) p.ox = Q('study').options.findIndex(o => o.v === a.study) * 1.7;
     if (a.day != null) p.warmth = 1 - a.day / 100;
-    if (a.place === 'rw') { p.hills = 0.95; p.river = 0; }
-    if (a.place === 'sa') { p.hills = 0.22; p.river = 1; }
+    if (a.place === 'rw') { p.hills = 0.95; p.coast = 0; p.table = 0; }
+    if (a.place === 'sa') { p.hills = 0.4; p.coast = 1; p.table = 1; }
     if (a.rank) p.oy = Q('rank').options.findIndex(o => o.v === a.rank[0]) * 1.3 + 0.4;
-    if (a.learn) p.warmth = clamp(p.warmth + { create: 0.15, teach: 0.1, build: 0, protect: -0.15 }[a.learn]);
+    if (a.learn) p.warmth = clamp(p.warmth + ({ create: 0.15, teach: 0.1, analyse: 0, explore: -0.15 }[a.learn] || 0));
     if (a.months) p.levels = 6 + a.months;
     if (a.start) p.oz = (hash(a.start) % 100) / 40;
     return p;
@@ -103,7 +104,7 @@
   function buildMeter() {
     $('#meter-list').innerHTML = Object.entries(D.programs).map(([k, p]) => `
       <li data-k="${k}"><span class="meter__name">${esc(p.name)}</span>
-      <span class="meter__place">${esc(D.places[p.place].city)}</span>
+      <span class="meter__place">${esc(p.tag)}</span>
       <span class="meter__bar"><i></i></span></li>`).join('');
   }
   function updateMeter() {
@@ -130,6 +131,8 @@
   const ICONS = {
     create: '<path d="M8 40 L22 12 L36 40" /><path d="M14 30 H30" /><circle cx="22" cy="12" r="3"/>',
     teach: '<path d="M6 12 C14 9 20 10 24 14 C28 10 34 9 42 12 V38 C34 35 28 36 24 40 C20 36 14 35 6 38 Z" /><path d="M24 14 V40" />',
+    analyse: '<path d="M8 40 H40" /><rect x="11" y="26" width="6" height="14" /><rect x="21" y="16" width="6" height="24" /><rect x="31" y="8" width="6" height="32" />',
+    explore: '<circle cx="24" cy="24" r="17" /><path d="M30 18 L26.5 26.5 L18 30 L21.5 21.5 Z" />',
     build: '<rect x="8" y="28" width="14" height="12" /><rect x="26" y="28" width="14" height="12" /><rect x="17" y="14" width="14" height="12" />',
     protect: '<path d="M24 6 C32 12 38 12 40 12 C40 28 34 37 24 42 C14 37 8 28 8 12 C10 12 16 12 24 6 Z" /><path d="M24 34 C24 26 28 20 33 18 C30 24 28 28 24 34" />'
   };
@@ -345,7 +348,7 @@
   function because(a, prog) {
     const parts = [];
     if (a.study) parts.push(opt('study', a.study).phrase);
-    if (a.place && a.place === prog.place) parts.push(opt('place', a.place).phrase);
+    if (a.place && prog.places.includes(a.place)) parts.push(opt('place', a.place).phrase);
     else if (a.day != null) parts.push(a.day > 60 ? "you're happiest out in nature" : a.day < 40 ? 'you come alive around people' : 'you want people and nature in your days');
     if (a.learn) parts.push(opt('learn', a.learn).phrase);
     else if (a.rank) parts.push(opt('rank', a.rank[0]).phrase);
@@ -356,24 +359,27 @@
   async function finish() {
     const r = ranking(state.answers);
     const k = r[0].k, k2 = r[1].k;
-    const prog = D.programs[k], place = D.places[prog.place];
-    const alt = D.programs[k2], altPlace = D.places[alt.place];
     const a = state.answers;
+    const where = p => p.places.includes(a.place) ? a.place : p.places[0];
+    const prog = D.programs[k], placeKey = where(prog), place = D.places[placeKey];
+    const alt = D.programs[k2], altPlace = D.places[where(alt)];
     const n = read(PRINTS, 0) + 1; write(PRINTS, n);
-    state.result = { k, k2, number: `Nº ${String(n).padStart(4, '0')}` };
+    state.result = { k, k2, place: placeKey, number: `Nº ${String(n).padStart(4, '0')}` };
 
     $('#result-title').textContent = prog.name;
+    $('#result-sub').textContent = prog.sub || '';
+    $('#result-sub').hidden = !prog.sub;
     $('#result-place').innerHTML = `${esc(place.city)}, ${esc(place.country)} <span>${esc(place.coords)}</span>`;
     $('#result-because').textContent = because(a, prog);
-    $('#result-blurb').textContent = prog.blurb;
+    const moved = a.place && placeKey !== a.place ? ` This role runs in ${place.city}.` : '';
+    $('#result-blurb').textContent = `${prog.blurb}${moved} ${place.way}`;
     $('#result-photo').innerHTML = `<img src="${img(prog.img)}" alt="">`;
     $('#result-alt').innerHTML = `Also worth a look: <strong>${esc(alt.name)}</strong> in ${esc(altPlace.city)}, ${esc(altPlace.country)}.`;
-    const biz = ['business', 'tourism'].includes(a.study);
-    $('#result-extra').hidden = !biz;
-    if (biz) $('#result-extra').textContent = `Studying business or tourism? Ask the team about open roles in ${D.businessRoles}.`;
+    $('#result-extra').innerHTML = `<strong>What you'd work on</strong><span>${prog.tasks.map(esc).join('</span><span>')}</span>`;
+    $('#result-extra').hidden = false;
 
     try { await document.fonts.ready; } catch { /* fonts are optional */ }
-    Land.print($('#print'), landFrom(a), {
+    Land.print($('#print'), landFrom({ ...a, place: placeKey }), {
       number: state.result.number,
       title: prog.name,
       place: `${place.city}, ${place.country}`,
@@ -428,7 +434,7 @@
       marketing: f.news.checked,
       study: opt('study', a.study)?.label || '',
       people_nature: a.day,
-      destination: a.place === 'rw' ? 'Rwanda' : 'South Africa',
+      destination: `${D.places[state.result.place].city}, ${D.places[state.result.place].country}`,
       priorities: (a.rank || []).map(v => opt('rank', v).label).join(' > '),
       learns_by: opt('learn', a.learn)?.label || '',
       months: a.months,
