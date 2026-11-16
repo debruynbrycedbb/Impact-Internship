@@ -459,26 +459,33 @@
     if (KIOSK) countdown();
   }
 
-  /* Sends unsent sign-ups to Supabase when it is set up in data.js. */
+  /* Sends unsent sign-ups to the Cloudflare Worker (set in data.js), which saves and emails them.
+     Each sign-up stays on this device until the Worker confirms it, so a weak fair Wi-Fi loses nothing. */
+  let syncing = false;
   async function sync() {
-    const { url, key, table } = D.supabase;
-    if (!url || !key || !navigator.onLine) return;
-    const all = read(STORE, []);
-    let changed = false;
-    for (const l of all.filter(x => !x.synced)) {
-      const { synced, ...row } = l;
-      try {
-        const res = await fetch(`${url}/rest/v1/${table}`, {
-          method: 'POST',
-          headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify(row)
-        });
-        if (res.ok) { l.synced = true; changed = true; }
-      } catch { break; }
-    }
-    if (changed) write(STORE, all);
+    const base = (D.worker || '').replace(/\/+$/, '');
+    if (!base || syncing || !navigator.onLine) return;
+    syncing = true;
+    try {
+      const all = read(STORE, []);
+      let changed = false;
+      for (const l of all.filter(x => !x.synced)) {
+        const { synced, ...row } = l;
+        try {
+          const res = await fetch(`${base}/lead`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(row)
+          });
+          if (res.ok || res.status === 400 || res.status === 413) { l.synced = res.ok ? true : 'rejected'; changed = true; }
+          else if (res.status === 429) break;
+        } catch { break; }
+      }
+      if (changed) write(STORE, all);
+    } finally { syncing = false; }
   }
   addEventListener('online', sync);
+  setInterval(sync, 60 * 1000);
 
   function savePrint() {
     $('#print').toBlob(b => {
@@ -535,9 +542,13 @@
   /* ---------- staff panel ---------- */
   function openAdmin() {
     const all = read(STORE, []);
-    const unsynced = all.filter(l => !l.synced).length;
+    const waiting = all.filter(l => !l.synced).length, rejected = all.filter(l => l.synced === 'rejected').length;
     $('#admin-summary').textContent = `${all.length} sign-up${all.length === 1 ? '' : 's'} saved in this browser.` +
-      (D.supabase.url ? ` ${unsynced} not yet sent to the database.` : ' No database is set up, so download the CSV before clearing this browser.');
+      (D.worker
+        ? (waiting ? ` ${waiting} still waiting to be sent (they go out when the connection is back).` : ' All sent to the inbox and database.') +
+          (rejected ? ` ${rejected} refused by the server: keep them via the CSV.` : '')
+        : ' Sending is not set up, so download the CSV before clearing this browser.');
+    sync();
     $('#admin-table').innerHTML = all.length ? `<table><thead><tr><th>When</th><th>Name</th><th>Email</th><th>School</th><th>Match</th></tr></thead><tbody>${
       all.slice().reverse().map(l => `<tr><td>${new Date(l.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td><td>${esc(l.name)}</td><td>${esc(l.email)}</td><td>${esc(l.school)}</td><td>${esc(l.match)}</td></tr>`).join('')}</tbody></table>` : '<p>No sign-ups yet.</p>';
     $('#admin').showModal();

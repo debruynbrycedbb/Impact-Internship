@@ -22,7 +22,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 body {
   margin: 0;
   min-height: 100svh;
@@ -422,6 +422,7 @@ body.is-kiosk #save-print { display: none; }
 .field__error { display: none; margin: 6px 0 0; font-size: .85rem; font-weight: 500; color: #a83c06; }
 .field__error.is-shown { display: block; }
 .check { display: flex; gap: 12px; align-items: flex-start; margin: 14px 0 0; font-size: .92rem; line-height: 1.45; color: #2b3450; cursor: pointer; }
+.check a { color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
 .check input { flex: none; width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--orange-deep); }
 .check + .field__error { margin-left: 34px; }
 .placeholder { padding: 0 4px; border-radius: 3px; background: #ffd9bf; }

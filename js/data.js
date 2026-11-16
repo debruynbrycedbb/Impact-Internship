@@ -2,10 +2,11 @@
    Everything a non-coder might want to change lives in this file. */
 
 window.IMPACT = {
-  /* Where sign-ups are sent. Leave both empty to keep sign-ups on this device only
-     (download them from the staff panel: add #admin to the address).
-     Only ever put a PUBLISHABLE key here (sb_publishable_…), never a secret key. */
-  supabase: { url: '', key: '', table: 'fair_leads' },
+  /* Where sign-ups are sent: the address of the Cloudflare Worker (see worker/SETUP.md),
+     e.g. 'https://impact-fair.yourname.workers.dev'. Leave it empty to keep sign-ups on this
+     device only (download them from the staff panel: add #admin to the address).
+     No keys or email addresses go here: they live in the Worker's settings. */
+  worker: 'https://impact-fair.debruynbryce-dbb.workers.dev',
 
   /* Seconds of no touching before the kiosk asks "Still exploring?" and then resets. */
   kiosk: { idleSeconds: 45, idleCountdown: 10, thanksSeconds: 20 },

@@ -15,19 +15,20 @@ python3 -m http.server 8767
 - `http://localhost:8767/?kiosk` is the stand version: a bigger font, a QR code on the start screen, "Still exploring?" after 45 s of no touching, and an automatic reset 20 s after a sign-up.
 
 ## Where things are
-- `js/data.js`: all text, questions, scoring, the eight roles (description, six tasks, where each runs), photo choices, timers and the (empty) database settings. **Change content here.**
+- `js/data.js`: all text, questions, scoring, the eight roles (description, six tasks, where each runs), photo choices, timers and the Worker address. **Change content here.**
+- `worker/`: the Cloudflare Worker that saves and emails sign-ups (`worker.js`), its table (`schema.sql`) and the setup steps (`SETUP.md`).
 - `js/land.js`: the contour landscape (Perlin noise + marching squares) and the 1080×1350 print.
 - `js/app.js`: quiz flow, live match meter, form, saving sign-ups, kiosk timers, staff panel.
 - `css/style.css`: the design. Colours are at the top (brand slate `#3a4a6b` and orange `#f2712a`, taken from the logo).
 - `img/`: photos from the company folder, resized for the web.
 
 ## Sign-ups
-- Saved in the browser (`localStorage`, key `ii-fair:v1:leads`).
-- **Staff panel:** hold the logo for 3 seconds, or add `#admin` to the address. It lists sign-ups and has **Download CSV** and **Delete all sign-ups**.
-- To send sign-ups to a database instead, fill `supabase.url` and `supabase.key` (publishable key only) in `js/data.js` and create a `fair_leads` table with the columns from the CSV. Unsent sign-ups retry when the device is back online.
+- Each sign-up is sent to a Cloudflare Worker, which saves it in a D1 database and emails it to the internships inbox (through Resend, or Cloudflare's own email once a domain is on Cloudflare). Setup: [worker/SETUP.md](worker/SETUP.md). The Worker address goes in `js/data.js` (`worker`).
+- A copy also stays in the browser (`localStorage`, key `ii-fair:v1:leads`) until the Worker confirms it; unsent ones retry every minute and when the device is back online.
+- **Staff panel:** hold the logo for 3 seconds, or add `#admin` to the address. It shows how many are still waiting to be sent, and has **Download CSV** and **Delete all sign-ups**.
 
 ## Placeholders and things to confirm
-- `[Privacy notice link]` in the consent checkbox.
+- `privacy.html` (linked from the consent checkbox) is a draft written from what the site actually does. Impact Internship has no privacy policy on its website, so the company must fill its placeholders: legal company name and registration, legal basis, retention period, when stand-screen copies are deleted, the no-sharing promise, where to complain, and the date.
 - Photo captions in the intro stack ("Rwanda" / "South Africa") are my guesses from the photos: confirm.
 - Environmental Studies is set to Kigali only, because its role sheet talks about Rwanda only. If it also runs in Cape Town, add `'sa'` to its `places` in `js/data.js`.
 - The role sheets still list "Hoedspruit, South Africa" in their contact details; the site uses Cape Town as asked.
